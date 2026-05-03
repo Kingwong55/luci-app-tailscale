@@ -42,7 +42,7 @@ do_update() {
     mkdir -p "$TMP_DIR"
 
     wget -qO "$TMP_DIR/tailscale.tgz" "$URL" 2>/dev/null
-    if [ $? -ne 0 ]; then
+    if [ ! -s "$TMP_DIR/tailscale.tgz" ]; then
         echo "{\"error\":\"download failed: $URL\"}"
         rm -rf "$TMP_DIR"
         exit 1
