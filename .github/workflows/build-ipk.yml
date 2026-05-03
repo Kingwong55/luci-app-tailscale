@@ -8,14 +8,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: [x86_64, aarch64_generic]
-        include:
-          - arch: x86_64
-            sdk_url: https://downloads.immortalwrt.org/releases/24.10.1/targets/x86/64/immortalwrt-sdk-24.10.1-x86-64_gcc-13.3.0_musl.Linux-x86_64.tar.zst
-          - arch: aarch64_generic
-            sdk_url: https://downloads.immortalwrt.org/releases/24.10.1/targets/armsr/armv8/immortalwrt-sdk-24.10.1-armsr-armv8_gcc-13.3.0_musl.Linux-x86_64.tar.zst
 
     steps:
       - name: Checkout
@@ -30,7 +22,7 @@ jobs:
 
       - name: Download SDK
         run: |
-          wget -q "${{ matrix.sdk_url }}" -O sdk.tar.zst
+          wget -q "https://downloads.immortalwrt.org/releases/24.10.1/targets/x86/64/immortalwrt-sdk-24.10.1-x86-64_gcc-13.3.0_musl.Linux-x86_64.tar.zst" -O sdk.tar.zst
           mkdir sdk
           tar --zstd -xf sdk.tar.zst --strip-components=1 -C sdk
 
@@ -40,7 +32,7 @@ jobs:
           echo "src-link tailscale ${{ github.workspace }}" > feeds.conf
           cat feeds.conf.default >> feeds.conf
           ./scripts/feeds update -a
-          ./scripts/feeds install luci-app-tailscale
+          ./scripts/feeds install -a
 
       - name: Build
         run: |
@@ -48,21 +40,22 @@ jobs:
           make defconfig
           make package/luci-app-tailscale/compile V=s -j$(nproc) || make package/luci-app-tailscale/compile V=s -j1
 
-      - name: Collect IPK
+      - name: Collect packages
         run: |
           mkdir -p output
-          find sdk/bin/ -name "luci-app-tailscale*.ipk" -exec cp {} output/ \;
+          find sdk/bin/ -name "luci-*tailscale*.ipk" -exec cp {} output/ \;
+          find sdk/bin/ -name "luci-*tailscale*.apk" -exec cp {} output/ \;
           ls -la output/
 
       - name: Upload to Release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: output/*.ipk
+          files: output/*
 
       - name: Upload Artifact
         if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
-          name: luci-app-tailscale-${{ matrix.arch }}
-          path: output/*.ipk
+          name: luci-app-tailscale-packages
+          path: output/*
