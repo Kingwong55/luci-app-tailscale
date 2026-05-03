@@ -12,6 +12,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          path: luci-app-tailscale
 
       - name: Install dependencies
         run: |
@@ -26,13 +28,18 @@ jobs:
           mkdir sdk
           tar --zstd -xf sdk.tar.zst --strip-components=1 -C sdk
 
+      - name: Prepare feed
+        run: |
+          mkdir -p feed/luci-app-tailscale
+          cp -r luci-app-tailscale/* feed/luci-app-tailscale/
+
       - name: Setup feeds
         run: |
           cd sdk
-          echo "src-link tailscale ${{ github.workspace }}" > feeds.conf
+          echo "src-link customfeed ${{ github.workspace }}/feed" > feeds.conf
           cat feeds.conf.default >> feeds.conf
           ./scripts/feeds update -a
-          ./scripts/feeds install -a
+          ./scripts/feeds install luci-app-tailscale
 
       - name: Build
         run: |
