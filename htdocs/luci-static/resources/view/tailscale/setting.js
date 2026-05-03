@@ -263,6 +263,101 @@ return view.extend({
 		o.default = '';
 		o.rmempty = true;
 
+		/* Core Update Section */
+		s = m.section(form.TypedSection);
+		s.anonymous = true;
+		s.title = _('Core Update');
+		s.description = _('Check and update the Tailscale binary to the latest version.');
+		s.render = function() {
+			return E('div', { class: 'cbi-section' }, [
+				E('h3', {}, _('Core Update')),
+				E('div', { class: 'cbi-value', style: 'margin-bottom: 10px' }, [
+					E('label', { class: 'cbi-value-title' }, _('Current Version')),
+					E('div', { class: 'cbi-value-field' }, [
+						E('span', { id: 'ts_current_ver' }, _('Checking...'))
+					])
+				]),
+				E('div', { class: 'cbi-value', style: 'margin-bottom: 10px' }, [
+					E('label', { class: 'cbi-value-title' }, _('Latest Version')),
+					E('div', { class: 'cbi-value-field' }, [
+						E('span', { id: 'ts_latest_ver' }, _('Checking...'))
+					])
+				]),
+				E('div', { class: 'cbi-value' }, [
+					E('label', { class: 'cbi-value-title' }, ''),
+					E('div', { class: 'cbi-value-field' }, [
+						E('button', {
+							class: 'btn cbi-button cbi-button-action',
+							id: 'ts_check_btn',
+							click: async function(ev) {
+								var btn = ev.target;
+								btn.disabled = true;
+								btn.textContent = _('Checking...');
+								try {
+									var res = await fs.exec('/usr/sbin/tailscale_helper', ['check_update']);
+									if (res.stdout) {
+										var data = JSON.parse(res.stdout.trim());
+										document.getElementById('ts_current_ver').textContent = data.current || 'unknown';
+										document.getElementById('ts_latest_ver').textContent = data.latest || 'unknown';
+										if (data.error) {
+											ui.addNotification(null, E('p', {}, data.error));
+										}
+									}
+								} catch(e) {
+									ui.addNotification(null, E('p', {}, e.message));
+								}
+								btn.disabled = false;
+								btn.textContent = _('Check Update');
+							}
+						}, _('Check Update')),
+						'\u00a0\u00a0',
+						E('button', {
+							class: 'btn cbi-button cbi-button-apply',
+							id: 'ts_update_btn',
+							click: async function(ev) {
+								if (!confirm(_('Update Tailscale to the latest version? The service will restart.')))
+									return;
+								var btn = ev.target;
+								btn.disabled = true;
+								btn.textContent = _('Updating...');
+								try {
+									var res = await fs.exec('/usr/sbin/tailscale_helper', ['do_update']);
+									if (res.stdout) {
+										var data = JSON.parse(res.stdout.trim());
+										if (data.success) {
+											document.getElementById('ts_current_ver').textContent = data.version;
+											ui.addNotification(null, E('p', { style: 'color:green' },
+												_('Updated successfully to %s').format(data.version)));
+										} else if (data.error) {
+											ui.addNotification(null, E('p', {}, _('Update failed: %s').format(data.error)));
+										}
+									}
+								} catch(e) {
+									ui.addNotification(null, E('p', {}, _('Update failed: %s').format(e.message)));
+								}
+								btn.disabled = false;
+								btn.textContent = _('Update Now');
+							}
+						}, _('Update Now'))
+					])
+				])
+			]);
+		};
+
+		/* Auto check version on page load */
+		setTimeout(async function() {
+			try {
+				var res = await fs.exec('/usr/sbin/tailscale_helper', ['check_update']);
+				if (res.stdout) {
+					var data = JSON.parse(res.stdout.trim());
+					var curEl = document.getElementById('ts_current_ver');
+					var latEl = document.getElementById('ts_latest_ver');
+					if (curEl) curEl.textContent = data.current || 'unknown';
+					if (latEl) latEl.textContent = data.latest || 'unknown';
+				}
+			} catch(e) {}
+		}, 1000);
+
 		return m.render();
 	}
 });
